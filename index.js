@@ -1,17 +1,13 @@
 const http = require('http');
 const debug = require('debug')('365daysof:api');
 const functional = require('ramda');
-const createCoroutine = require('co');
 const createJwtParser = require('koa-jwt');
 const createWebServer = require('koa');
 const createBodyParser = require('koa-bodyparser');
 
-const createUser = require('./model/user');
-const createDataMapper = require('./data/mapper/mongodb');
 const createUserRouter = require('./routers/users');
 
 const omit = functional.omit;
-const contains = functional.contains;
 
 const DEFAULT_OPTIONS = {
   port: 3000,
@@ -23,7 +19,7 @@ const DEFAULT_OPTIONS = {
   jwtParser: {
     key: 'token',
     secret: 'sabrina',
-    passthrough: true
+    passthrough: true,
   },
 };
 const PAGINATION_FIELDS = ['skip', 'limit'];
@@ -75,15 +71,15 @@ function createWebApp(options) {
     },
   };
 
-  const userRouter = createUserRouter({mapper: dataMappers.users});
+  const userRouter = createUserRouter({ mapper: dataMappers.users });
 
   const middleware = [
     createPager(options.pager),
     createBodyParser(),
     createJwtParser(options.jwtParser),
-    createUserInflatter({mapper: dataMappers.users}),
+    createUserInflatter({ mapper: dataMappers.users }),
     userRouter.allowedMethods(),
-    userRouter.routes()
+    userRouter.routes(),
   ];
 
   middleware.forEach(app.useMiddleware);
@@ -103,7 +99,7 @@ function createPager(options) {
       options,
       {
         skip,
-        limit
+        limit,
       }
     );
 
