@@ -2,7 +2,7 @@ const http = require('http');
 const debug = require('debug')('365daysof:api');
 const functional = require('ramda');
 const createJwtParser = require('koa-jwt');
-const createWebServer = require('koa');
+const createKoaServer = require('koa');
 const createBodyParser = require('koa-bodyparser');
 
 const createUserRouter = require('./routers/users');
@@ -23,6 +23,7 @@ const DEFAULT_OPTIONS = {
   },
 };
 const PAGINATION_FIELDS = ['skip', 'limit'];
+const USER_DATA_MAPPER_SERVICE = 'mapper:user';
 
 function createWebApp(options) {
   options = Object.assign(
@@ -33,10 +34,17 @@ function createWebApp(options) {
 
   debug('options %j (keys only)', Object.keys(options));
 
-  const dataMappers = options.dataMappers;
+  const serviceRegistry = options.serviceRegistry;
 
-  const koaServer = createWebServer();
+  const koaServer = createKoaServer();
   const webServer = http.createServer();
+
+  koaServer.context = Object.create(koaServer.context, {
+    services: {
+      enumerable: true,
+      get() { return serviceRegistry; },
+    },
+  });
 
   const stopWebServer = function* stopWebServer() {
     yield done => webServer.close(done);
@@ -45,15 +53,18 @@ function createWebApp(options) {
     yield done => webServer.listen(options.port, options.host, done);
   };
   const initializeApplication = function* initializeApplication() {
-    const serverCallback = koaServer.callback();
+    yield serviceRegistry.initialize();
 
-    webServer.on('request', serverCallback);
+    webServer.on('request', koaServer.callback());
   };
   const destroyApplication = function* destroyApplication() {
     yield stopWebServer();
   };
 
   const app = {
+    get services() {
+      return serviceRegistry;
+    },
     *initialize() {
       yield initializeApplication();
     },
@@ -71,13 +82,13 @@ function createWebApp(options) {
     },
   };
 
-  const userRouter = createUserRouter({ mapper: dataMappers.users });
+  const userRouter = createUserRouter();
 
   const middleware = [
     createPager(options.pager),
     createBodyParser(),
     createJwtParser(options.jwtParser),
-    createUserInflatter({ mapper: dataMappers.users }),
+    createUserInflatter(),
     userRouter.allowedMethods(),
     userRouter.routes(),
   ];
@@ -114,11 +125,11 @@ function createUserInflatter(options) {
     options = options || {};
 
     if (this.state.token) {
-      const mapper = options.mapper;
       const userId = this.state.token.email;
       const query = { _id: userId };
 
       try {
+        const mapper = this.app.services.get(USER_DATA_MAPPER_SERVICE);
         const user = yield mapper.findOne({ query });
 
         this.state.user = user;

@@ -1,7 +1,6 @@
 const functional = require('ramda');
 
 const values = functional.values;
-const forEach = functional.forEach;
 
 function createServiceRegistry() {
   const registeredServices = {};
@@ -17,20 +16,12 @@ function createServiceRegistry() {
       delete registeredServices[id];
     },
     *initialize() {
-      forEach(initializeService, values(registeredServices));
+      yield values(registeredServices).map(rs => rs.initialize);
     },
     *destroy() {
-      forEach(destroyService, values(registeredServices));
+      yield values(registeredServices).map(rs => rs.destroy);
     },
   };
-}
-
-function* initializeService(s) {
-  yield s.initialize();
-}
-
-function* destroyService(s) {
-  yield s.destroy();
 }
 
 module.exports = createServiceRegistry;
